@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-badge">JWT/JWS Authentication</div>
+      <h1>Sign in</h1>
+      <p class="subtitle">POST JSON to /auth/signin and receive access & refresh JWS tokens.</p>
+
+      <form id="loginForm" class="auth-form">
+        <label>
+          User ID
+          <input type="text" name="email" placeholder="200561903346" required />
+        </label>
+
+        <label>
+          Password
+          <input type="password" name="password" placeholder="Itmd@#4321" required />
+        </label>
+
+        <button type="submit">Authenticate</button>
+      </form>
+
+      <div class="hint">
+        Demo user: 200561903346 / password: Itmd@#4321
+      </div>
+
+      <div class="token-actions">
+        <button id="refreshBtn" disabled>Refresh Token</button>
+        <button id="logoutBtn" disabled>Logout</button>
+      </div>
+
+      <section class="result-panel" id="resultPanel" aria-live="polite">
+        <h2>Response</h2>
+        <pre id="responseOutput">No request yet.</pre>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const output = document.getElementById('responseOutput');
+    const resultPanel = document.getElementById('resultPanel');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const formData = new FormData(form);
+      const payload = {
+        email: formData.get('email'),
+        password: formData.get('password'),
+      };
+
+      output.textContent = 'Sending request...';
+      resultPanel.classList.remove('success', 'error');
+
+      try {
+        const response = await fetch('/auth/signin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Authentication failed.');
+        }
+
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.setItem('authUser', JSON.stringify(data.user));
+
+        refreshBtn.disabled = false;
+        logoutBtn.disabled = false;
+
+        resultPanel.classList.add('success');
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultPanel.classList.add('error');
+        output.textContent = error.message;
+      }
+    });
+
+    refreshBtn.addEventListener('click', async () => {
+      const refreshToken = localStorage.getItem('refreshToken');
+
+      if (!refreshToken) {
+        alert('No refresh token found. Please sign in first.');
+        return;
+      }
+
+      output.textContent = 'Refreshing token...';
+      resultPanel.classList.remove('success', 'error');
+
+      try {
+        const response = await fetch('/auth/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Token refresh failed.');
+        }
+
+        localStorage.setItem('accessToken', data.accessToken);
+
+        resultPanel.classList.add('success');
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultPanel.classList.add('error');
+        output.textContent = error.message;
+      }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      const refreshToken = localStorage.getItem('refreshToken');
+
+      output.textContent = 'Logging out...';
+      resultPanel.classList.remove('success', 'error');
+
+      try {
+        const response = await fetch('/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type' : 'application/json',
+          },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const data = await response.json();
+
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('authUser');
+
+        refreshBtn.disabled = true;
+        logoutBtn.disabled = true;
+
+        resultPanel.classList.add('success');
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultPanel.classList.add('error');
+        output.textContent = error.message;
+      }
+    });
+  </script>
+</body>
+</html>
